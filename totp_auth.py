@@ -1,6 +1,6 @@
 
 
-totp_key='asdfgasdf'
+totp_key='3AAB'
 
 import pyotp as tp
 t = tp.TOTP(totp_key).now()
