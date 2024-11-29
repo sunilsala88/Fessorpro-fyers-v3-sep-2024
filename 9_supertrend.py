@@ -1,3 +1,10 @@
+# Supertrend and EMA Strategy
+# Calculate the Supertrend on daily candles.
+# Calculate the EMA (Exponential Moving Average) on hourly candles.
+# Go Long:When the daily Supertrend gives a long signal and the closing price is greater than the daily EMA.
+# Go Short:When the daily Supertrend gives a short signal.The closing price is less than the daily EMA.
+
+
 import credentials as crs
 from fyers_apiv3 import fyersModel
 import pandas as pd
@@ -66,9 +73,10 @@ def get_historical_data(ticker,interval,duration):
     sdata.date=(sdata.date.dt.tz_localize('UTC').dt.tz_convert('Asia/Kolkata'))
     sdata['date'] = sdata['date'].dt.tz_localize(None)
     sdata=sdata.set_index('date')
-    sdata['sma1']=ta.sma(sdata['close'],length=10)
-    sdata['sma2']=ta.sma(sdata['close'],length=30)
-
+    sdata['supertrend']=ta.sma(sdata['close'],length=10)
+    sdata['ema']=ta.ema(sdata.close, length=20)
+    sdata['super']=ta.supertrend(sdata.high,sdata.low,sdata.close,length=10)['SUPERTd_10_3.0']
+    sdata['atr']=ta.atr(sdata.high, sdata.low, sdata.close, length=14)
     return sdata
 
 
@@ -123,7 +131,53 @@ def close_ticker_postion(name):
  
 
 
-def trade_buy_stocks(stock_name,stock_price,quantity=1):
+def trade_sell_stocks(stock_name,stock_price,stop_price,quantity=1):
+   
+    if check_market_order_placed(ticker):
+        data = {
+                    "symbol":stock_name,
+                    "qty":quantity,
+                    "type":2,
+                    "side":-1,
+                    "productType":"INTRADAY",
+                    "limitPrice":0,
+                    "stopPrice":0,
+                    "validity":"DAY",
+                    "disclosedQty":0,
+                    "offlineOrder":False,
+                    "stopLoss":0,
+                    "takeProfit":0
+                }
+
+        response3 = fyers.place_order(data=data)
+        if response3['s']=='ok':
+            a=[stock_name,stock_price,'SELL',quantity] 
+            
+            print('call buy condition satisfied')
+
+            data = {
+                "symbol":stock_name,
+                "qty":quantity,
+                "type":3,
+                "side":1,
+                "productType":"INTRADAY",
+                "limitPrice":0,
+                "stopPrice":stop_price,
+                "validity":"DAY",
+                "disclosedQty":0,
+                "offlineOrder":False,
+                "orderTag":"tag1"
+                }
+            response3 = fyers.place_order(data=data)
+            print(response3)
+
+        else:
+            print('order did not go through')
+            print(response3)
+        #placing stop order
+
+
+def trade_buy_stocks(stock_name,stock_price,stop_price,quantity=1):
     if check_market_order_placed(ticker):
         data = {
             "symbol":stock_name,
@@ -141,51 +195,61 @@ def trade_buy_stocks(stock_name,stock_price,quantity=1):
         }
 
         response3 = fyers.place_order(data=data)
+        if response3['s']=='ok':
+            a=[stock_name,stock_price,'BUY',quantity] 
+            print('print done buying')
+            print('call buy condition satisfied')
 
-        # if response3['s']=='ok':
-        #     a=[stock_name,stock_price,'BUY',quantity_] 
-       
-        #     print('call buy condition satisfied')
+            #placing stop order
+            data = {
+            "symbol":stock_name,
+            "qty":quantity,
+            "type":3,
+            "side":-1,
+            "productType":"INTRADAY",
+            "limitPrice":0,
+            "stopPrice":stop_price,
+            "validity":"DAY",
+            "disclosedQty":0,
+            "offlineOrder":False,
+            "orderTag":"tag1"
+            }
+            response3 = fyers.place_order(data=data)
+            print(response3)
 
-        #     #placing stop order
-        #     data = {
-        #     "symbol":stock_name,
-        #     "qty":quantity,
-        #     "type":3,
-        #     "side":-1,
-        #     "productType":"INTRADAY",
-        #     "limitPrice":0,
-        #     "stopPrice":int(stock_price*0.90),
-        #     "validity":"DAY",
-        #     "disclosedQty":0,
-        #     "offlineOrder":False,
-        #     "orderTag":"tag1"
-        #     }
-        #     response3 = fyers.place_order(data=data)
-        #     print(response3)
-
-        # else:
-            
-        #     print('order did not go through')
+        else:
+            print('order did not go through')
+            print(response3)
 
 
-def strategy_condition(hist_df,ticker):
+def strategy_condition(hist_df_hourly,hist_df_daily,ticker):
     print('inside strategy conditional code ')
     # print(hist_df)
     print(ticker)
-    buy_condition=(hist_df['sma1'].iloc[-1]>hist_df['sma2'].iloc[-1]) and (hist_df['sma1'].iloc[-2]<hist_df['sma2'].iloc[-2])
+    buy_condition=hist_df_hourly['super'].iloc[-1]>0 and hist_df_daily['ema'].iloc[-1]<hist_df_hourly['close'].iloc[-1]
+    # buy_condition=True
+    sell_condition=hist_df_hourly['super'].iloc[-1]<0 and hist_df_daily['ema'].iloc[-1]>hist_df_hourly['close'].iloc[-1]
+    # sell_condition=True
+
     money = int(fyers.funds()['fund_limit'][0]['equityAmount'])
     money=money/3
     print(money)
-    closing_price=hist_df['close'].iloc[-1]
-    if money>closing_price:
+    hourly_closing_price=hist_df_hourly['close'].iloc[-1]
+    atr_value=hist_df_daily['atr'].iloc[-1]
+
+    if money>hourly_closing_price:
         if buy_condition:
             print('buy condition satisfied')
-            trade_buy_stocks(ticker,closing_price)
+            trade_buy_stocks(ticker,hourly_closing_price,hourly_closing_price-atr_value)
+        elif sell_condition:
+            print('sell condition satisfied')
+            trade_sell_stocks(ticker,hourly_closing_price,hourly_closing_price+atr_value)
+
         else:
             print('no condition satisfied')
     else:
         print('we dont have enough money to trade')
+
 
 
 
@@ -200,6 +264,8 @@ def main_strategy():
         #historical data with indicator data
         hist_df=get_historical_data(ticker,f'{time_frame}',days)
         # print(hist_df)
+        hist_df_hourly=get_historical_data(ticker,'60',10)
+        hist_df_daily=get_historical_data(ticker,'D',50)
 
         money = int(fyers.funds()['fund_limit'][0]['equityAmount'])
         money=money/3
@@ -231,14 +297,38 @@ def main_strategy():
                 strategy_condition(hist_df,ticker)
 
             elif curr_quant>0:
-                print('we are already long')
-                sell_condition=(hist_df['sma1'].iloc[-1]<hist_df['sma2'].iloc[-1]) and (hist_df['sma1'].iloc[-2]>hist_df['sma2'].iloc[-2])
+
+  
+                print('we have current ticker in position and is long')
+                sell_condition=hist_df_hourly['super'].iloc[-1]<0 and hist_df_daily['ema'].iloc[-1]>hist_df_hourly['close'].iloc[-1]
+   
                 if sell_condition:
-                    print('sell condition is satisfied ')
-                    close_ticker_postion(ticker)
-                else:
-                    print('sell condition not satisfied')
-            
+                            hourly_closing_price=hist_df_hourly['close'].iloc[-1]
+                            atr_value=hist_df_daily['atr'].iloc[-1]
+                            print('sell condition satisfied')
+                
+                            close_ticker_open_orders(ticker)
+                            time.sleep(1)
+                            close_ticker_postion(ticker)
+                            time.sleep(1)
+                            trade_sell_stocks(ticker,hourly_closing_price,hourly_closing_price+atr_value)
+
+            elif curr_quant<0:
+                print('we have current ticker in position and is short')
+
+                hourly_closing_price=hist_df_hourly['close'].iloc[-1]
+                atr_value=hist_df_daily['atr'].iloc[-1]
+                buy_condition=hist_df_hourly['super'].iloc[-1]>0 and hist_df_daily['ema'].iloc[-1]<hist_df_hourly['close'].iloc[-1]
+
+                if buy_condition:
+                            print('buy condiiton satisfied')
+                 
+                            close_ticker_open_orders(ticker)
+                            time.sleep(1)
+                            close_ticker_postion(ticker)    
+                            time.sleep(1)            
+                            trade_buy_stocks(ticker,hourly_closing_price,hourly_closing_price-atr_value)
+     
 
 
 
