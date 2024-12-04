@@ -49,15 +49,15 @@ logging.basicConfig(level=logging.INFO, filename=f'option_strategy_{dt.date.toda
 
 index_name='NIFTYBANK'
 ticker=f"NSE:{index_name}-INDEX"
-ticker='MCX:CRUDEOIL24DECFUT'
+# ticker='MCX:CRUDEOIL24DECFUT'
 strike_count=10
-strike_diff=50
+strike_diff=100
 account_type='PAPER'
 buffer=5
 profit_loss_point=30
 start_hour,start_min=9,30
 end_hour,end_min=22,15
-quantity=100
+quantity=15
 
 ct=dt.datetime.now()
 start_time=dt.datetime(ct.year,ct.month,ct.day,start_hour,start_min)
@@ -132,6 +132,8 @@ def calculate_cpr(high, low, close):
 pivot,resistance,support = calculate_cpr(hist_data['high'].iloc[-1], hist_data['low'].iloc[-1], hist_data['close'].iloc[-1])
 print(pivot,resistance,support)
 
+resistance=52800
+pivot=52750
 
 
 # option chain

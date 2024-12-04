@@ -1,0 +1,4 @@
+2024-12-04 09:31:50,633 - strategy condition condition satisfied
+2024-12-04 09:31:50,644 - call price is 903.0 and put price is 742.65
+2024-12-04 09:40:55,841 - call buy condition satisfied name is NSE:BANKNIFTY24DEC52800CE price is 904.2
+2024-12-04 09:44:55,092 - call sell condition satisfied name is NSE:BANKNIFTY24DEC52800CE price is 933.75
