@@ -1,3 +1,23 @@
+# Bank Nifty Strategy
+
+# Strategy Start Time: 9:30 AM
+# Setup:
+# Calculate the Pivot, Support, and Resistance levels before the market opens.
+
+# Entry:
+# Monitor the spot price of Bank Nifty.
+# When the spot price touches any of the calculated levels (Pivot, Support, or Resistance),
+# place a limit order for the At-The-Money (ATM) Call or Put option with a 30-point buffer.
+
+# Wait for Execution: Only one of the orders (Call or Put) should get executed.
+# We will not take positions in both Call and Put simultaneously.
+
+# Exit Rules:
+# Set a Stop Loss and Take Profit of 30 points.
+# The trade will end either with a 30-point loss or a 30-point profit.
+
+# Trade Limit:
+# Only 1 trade per day is allowed under this strategy.
 
 
 
@@ -29,15 +49,15 @@ logging.basicConfig(level=logging.INFO, filename=f'option_strategy_{dt.date.toda
 
 index_name='NIFTYBANK'
 ticker=f"NSE:{index_name}-INDEX"
-# ticker='MCX:CRUDEOIL24DECFUT'
+ticker='MCX:CRUDEOIL24DECFUT'
 strike_count=10
-strike_diff=100
+strike_diff=50
 account_type='PAPER'
 buffer=5
 profit_loss_point=30
-start_hour,start_min=9,35
+start_hour,start_min=9,30
 end_hour,end_min=22,15
-quantity=15
+quantity=100
 
 ct=dt.datetime.now()
 start_time=dt.datetime(ct.year,ct.month,ct.day,start_hour,start_min)
@@ -56,8 +76,6 @@ data = {
 
 #getting expiry
 response = fyers.optionchain(data=data)['data']
-# print(response)
-# print(pd.DataFrame(response['expiryData']))
 expiry=response['expiryData'][0]['date']
 print(expiry)
 expiry_e=response['expiryData'][0]['expiry']
@@ -114,7 +132,7 @@ def calculate_cpr(high, low, close):
 pivot,resistance,support = calculate_cpr(hist_data['high'].iloc[-1], hist_data['low'].iloc[-1], hist_data['close'].iloc[-1])
 print(pivot,resistance,support)
 
-pivot=51865
+
 
 # option chain
 data = {
@@ -157,8 +175,7 @@ def get_otm_option(spot_price, side,points=100):
     otm_option=option_chain[(option_chain['strike_price']==otm_strike) & (option_chain['option_type']==side) ]['symbol'].squeeze()
     return otm_option
 
-n=get_otm_option(5848,'CE',100)
-print(n)
+
 
 #getting current position
 def get_position():
@@ -207,8 +224,8 @@ if account_type=='PAPER':
         column_names = ['time','ticker','price','action','stop_price','take_profit','spot_price','quantity']
         filled_df = pd.DataFrame(columns=column_names)
         filled_df.set_index('time',inplace=True)
-        paper_option_data_info={'call_buy':{'option_name':call_option,'trade_flag':0,'buy_price':0,'current_stop_price':0,'current_profit_price':0,'filled_df':filled_df.copy(),'underlying_price_level':0,'quantity':0,'pnl':0},
-                                'put_buy':{'option_name':put_option,'trade_flag':0,'buy_price':0,'current_stop_price':0,'current_profit_price':0,'filled_df':filled_df.copy(),'underlying_price_level':0,'quantity':0,'pnl':0},
+        paper_option_data_info={'call_buy':{'option_name':call_option,'trade_flag':0,'buy_price':0,'current_stop_price':0,'current_profit_price':0,'filled_df':filled_df.copy(),'underlying_price_level':0,'quantity':quantity,'pnl':0},
+                                'put_buy':{'option_name':put_option,'trade_flag':0,'buy_price':0,'current_stop_price':0,'current_profit_price':0,'filled_df':filled_df.copy(),'underlying_price_level':0,'quantity':quantity,'pnl':0},
                                 'condition':False
                                 }
 
@@ -221,11 +238,10 @@ else:
         column_names = ['time','ticker','price','action','stop_price','take_profit','spot_price','quantity']
         filled_df = pd.DataFrame(columns=column_names)
         filled_df.set_index('time',inplace=True)
-        live_option_data_info={'call_buy':{'option_name':call_option,'trade_flag':0,'buy_price':0,'current_stop_price':0,'current_profit_price':0,'filled_df':filled_df.copy(),'underlying_price_level':0,'quantity':0,'pnl':0},
-                                'put_buy':{'option_name':put_option,'trade_flag':0,'buy_price':0,'current_stop_price':0,'current_profit_price':0,'filled_df':filled_df.copy(),'underlying_price_level':0,'quantity':0,'pnl':0},
+        live_option_data_info={'call_buy':{'option_name':call_option,'trade_flag':0,'buy_price':0,'current_stop_price':0,'current_profit_price':0,'filled_df':filled_df.copy(),'underlying_price_level':0,'quantity':quantity,'pnl':0},
+                                'put_buy':{'option_name':put_option,'trade_flag':0,'buy_price':0,'current_stop_price':0,'current_profit_price':0,'filled_df':filled_df.copy(),'underlying_price_level':0,'quantity':quantity,'pnl':0},
                                 'condition':False
                                 }
-
 
 
 
@@ -277,280 +293,279 @@ def paper_order():
     global paper_option_data_info
     global df
     global spot_price
-    spot_price=df[df['symbol']==ticker]['ltp'].iloc[0]
+    #get spot price
 
     spot_price=df.loc[ticker,'ltp']
     print(f"spot is {spot_price} pivot is {pivot} support is {support} resistance is {resistance}")
-    print(spot_price)
+    #current time
     ct=dt.datetime.now()
+    
+    #if current time is greater than current time than start strategy
     if ct>start_time:
 
-        # print(df)
+        #get flag
         call_buy_trade_flag=paper_option_data_info['call_buy']['trade_flag']
         put_buy_trade_flag=paper_option_data_info['put_buy']['trade_flag']
 
+        #get stop price
         call_buy_stop_price=paper_option_data_info['call_buy']['current_stop_price']
         put_buy_stop_price=paper_option_data_info['put_buy']['current_stop_price']
 
+        #get target price
         call_buy_profit_price=paper_option_data_info['call_buy']['current_profit_price']
         put_buy_profit_price=paper_option_data_info['put_buy']['current_profit_price']
         
+        #get name
         call_name=paper_option_data_info['call_buy']['option_name']
         put_name=paper_option_data_info['put_buy']['option_name']
 
+        #get buy price
         call_buy_price=paper_option_data_info['call_buy']['buy_price']
         put_buy_price=paper_option_data_info['put_buy']['buy_price']
-        # print(call_name, put_name)
-        # call_price=df[df['symbol']==call_name]['ltp'].iloc[0]
+
+        #get current price
         call_price=df.loc[call_name,'ltp']
-        # put_price=df[df['symbol']==put_name]['ltp'].iloc[0]
         put_price=df.loc[put_name,'ltp']
 
-        print(call_price,put_price)
+        #get condition
         condition=paper_option_data_info['condition']
+        print(call_price,put_price)
 
+        #if current time is greater than end time
         if ct>end_time:
             print('closing everything')
             
+            #if we have taken trade 
             if call_buy_trade_flag==1:
-
-                paper_option_data_info['call_buy']['quantity']=0
-                # call_buy_ltp=df[df['symbol']==call_name]['ltp'].iloc[0]
-                call_buy_ltp=df.loc[call_name,'ltp']
-                name=paper_option_data_info['call_buy']['option_name']
+                #close call buy position
+                paper_option_data_info['call_buy']['quantity']=0 #change quantity
+                call_buy_ltp=df.loc[call_name,'ltp'] #get current price
+                name=paper_option_data_info['call_buy']['option_name'] #get current name
                 a=[name,call_buy_ltp,'SELL',0,0,spot_price,paper_option_data_info['call_buy']['quantity']]
-                paper_option_data_info['call_buy']['filled_df'].loc[dt.datetime.now()] = a
-                paper_option_data_info['call_buy']['trade_flag']=2
+                paper_option_data_info['call_buy']['filled_df'].loc[dt.datetime.now()] = a #update dataframe
+                paper_option_data_info['call_buy']['trade_flag']=2 #change flag so no trade taken again
+                logging.info('closing call leg due to time condition') 
 
             if put_buy_trade_flag==1:
-                paper_option_data_info['put_buy']['quantity']=0
-                # put_buy_ltp=df[df['symbol']==put_name]['ltp'].iloc[0]
-                put_buy_ltp=df.loc[put_name,'ltp']
-                name=paper_option_data_info['put_buy']['option_name']
+                paper_option_data_info['put_buy']['quantity']=0 #change quantity
+                put_buy_ltp=df.loc[put_name,'ltp'] #get current price
+                name=paper_option_data_info['put_buy']['option_name'] #get current name
                 a=[name,put_buy_ltp,'SELL',0,0,spot_price,paper_option_data_info['put_buy']['quantity']]
+                paper_option_data_info['put_buy']['filled_df'].loc[dt.datetime.now()] = a #update dataframe
+                paper_option_data_info['put_buy']['trade_flag']=2 #change flag so no trade taken again
+                logging.info('closing put leg due to time condition') 
 
-                paper_option_data_info['put_buy']['filled_df'].loc[dt.datetime.now()] = a
-                paper_option_data_info['put_buy']['trade_flag']=2
-
-            # return 0
-            # sys.exit()
-
-    
-
-        #condition satisfied
+        #buy condition satisfied
         if (pivot-buffer<=spot_price<=pivot+buffer) or (support-buffer<=spot_price <= support+buffer ) or (resistance-buffer <= spot_price <= resistance+buffer) :
             if condition==False:
       
                 logging.info('strategy condition condition satisfied')  
                 
-                call_name=get_otm_option(spot_price, 'CE',0)
-                paper_option_data_info['call_buy']['option_name']=call_name
-                paper_option_data_info['call_buy']['quantity']=quantity
+                call_name=get_otm_option(spot_price, 'CE',0) #get call name
+                paper_option_data_info['call_buy']['option_name']=call_name #update call name data
+                paper_option_data_info['call_buy']['quantity']=quantity #update quantity
 
-                put_name=get_otm_option(spot_price, 'PE', 0)
-                paper_option_data_info['put_buy']['option_name']=put_name
-                paper_option_data_info['put_buy']['quantity']=quantity
+                put_name=get_otm_option(spot_price, 'PE', 0) #get put name
+                paper_option_data_info['put_buy']['option_name']=put_name #update put name
+                paper_option_data_info['put_buy']['quantity']=quantity #update put quantity
 
-                # current_price=df[df['symbol']==call_name]['ltp'].iloc[0]
-                current_price=df.loc[call_name,'ltp']
-                call_buy_ltp=current_price+profit_loss_point
-                call_buy_stop_price=call_buy_ltp-profit_loss_point
-                call_buy_profit_price=call_buy_ltp+profit_loss_point
 
-                # current_price=df[df['symbol']==put_name]['ltp'].iloc[0]
-                current_price=df.loc[put_name,'ltp']
-                put_buy_ltp=current_price+profit_loss_point
-                put_buy_stop_price=put_buy_ltp-profit_loss_point
-                put_buy_profit_price=put_buy_ltp+profit_loss_point
+                current_price=df.loc[call_name,'ltp'] #get call current price
+                call_buy_ltp=current_price+profit_loss_point  #get call buy price
+                call_buy_stop_price=call_buy_ltp-profit_loss_point #get call stop price
+                call_buy_profit_price=call_buy_ltp+profit_loss_point #get call profit price
 
-                paper_option_data_info['call_buy']['buy_price']=call_buy_ltp
-                paper_option_data_info['call_buy']['current_stop_price']=call_buy_stop_price
-                paper_option_data_info['call_buy']['current_profit_price']=call_buy_profit_price
 
-                paper_option_data_info['put_buy']['buy_price']=put_buy_ltp
-                paper_option_data_info['put_buy']['current_stop_price']=put_buy_stop_price
-                paper_option_data_info['put_buy']['current_profit_price']=put_buy_profit_price
+                current_price=df.loc[put_name,'ltp'] #get put current price
+                put_buy_ltp=current_price+profit_loss_point #get put buy price
+                put_buy_stop_price=put_buy_ltp-profit_loss_point #get put stop price
+                put_buy_profit_price=put_buy_ltp+profit_loss_point #get put profit price
 
-                paper_option_data_info['condition']=True
+                paper_option_data_info['call_buy']['buy_price']=call_buy_ltp #save call buy price
+                paper_option_data_info['call_buy']['current_stop_price']=call_buy_stop_price #save call stop price
+                paper_option_data_info['call_buy']['current_profit_price']=call_buy_profit_price #save call take profit
+
+                paper_option_data_info['put_buy']['buy_price']=put_buy_ltp #save put buy price
+                paper_option_data_info['put_buy']['current_stop_price']=put_buy_stop_price #save put stop price
+                paper_option_data_info['put_buy']['current_profit_price']=put_buy_profit_price #save put profit price
+
+                paper_option_data_info['condition']=True #update condition
                 logging.info(f"call price is {call_buy_ltp} and put price is {put_buy_ltp}")
                 print('done fetching prices')
 
         #call buy condition
         if (condition==True) and (call_buy_price<=call_price) and (call_buy_trade_flag==0) :
                 a=[call_name,call_price,'BUY',call_buy_stop_price,call_buy_profit_price,spot_price,quantity] 
-                paper_option_data_info['call_buy']['filled_df'].loc[ct] = a
-                paper_option_data_info['call_buy']['trade_flag']=1
-                paper_option_data_info['put_buy']['trade_flag']=3
-                logging.info('print done buying')
-                print('call buy condition satisfied')
+                paper_option_data_info['call_buy']['filled_df'].loc[ct] = a #save to dataframe
+                paper_option_data_info['call_buy']['trade_flag']=1 #update call flag
+                paper_option_data_info['put_buy']['trade_flag']=3 #update put flag
+                logging.info(f'call buy condition satisfied name is {call_name} price is {call_price}')
 
 
         #call sell condition
         elif condition==True and (call_buy_trade_flag==1) :
-        
-            if (call_price>call_buy_profit_price) or (call_price<call_buy_stop_price):
-                logging.info('sell call condition satisfied')   
-                #close position
-                name=paper_option_data_info['call_buy']['option_name']
-                paper_option_data_info['call_buy']['quantity']=0
-                a=[name,call_price,'SELL',0,0,spot_price,0]
-                paper_option_data_info['call_buy']['filled_df'].loc[ct] = a
-                paper_option_data_info['call_buy']['trade_flag']=2
-                print('call sell condition satisfied')
+            if (call_price>call_buy_profit_price) or (call_price<call_buy_stop_price):  
+                paper_option_data_info['call_buy']['quantity']=0 #update quantity
+                a=[call_name,call_price,'SELL',0,0,spot_price,0]
+                paper_option_data_info['call_buy']['filled_df'].loc[ct] = a #update dataframe
+                paper_option_data_info['call_buy']['trade_flag']=2 #update flag
+                logging.info(f'call sell condition satisfied name is {call_name} price is {call_price}')
 
 
         #put buy condition
         if (condition==True) and (put_buy_price<=put_price) and (put_buy_trade_flag==0) :
             a=[put_name,put_price,'BUY',put_buy_stop_price,put_buy_profit_price,spot_price,quantity]
-            paper_option_data_info['put_buy']['filled_df'].loc[ct] = a
-            paper_option_data_info['put_buy']['trade_flag']=1
-            paper_option_data_info['call_buy']['trade_flag']=3
-            logging.info('put buy condition satisfied')
-            print('put buy condition satisfied')
+            paper_option_data_info['put_buy']['filled_df'].loc[ct] = a #update dataframe
+            paper_option_data_info['put_buy']['trade_flag']=1 #update put flag
+            paper_option_data_info['call_buy']['trade_flag']=3 #update call flag
+            logging.info(f'put buy condition satisfied name is {put_name} price is {put_price}')
+            print(f'put buy condition satisfied name is {put_name} price is {put_price}')
 
 
         #put sell condition
         elif condition==True and (put_buy_trade_flag==1):
             if (put_price>put_buy_profit_price) or (put_price<put_buy_stop_price):
-                logging.info('sell put condition satisfied')
-                #close position
-
-                name=paper_option_data_info['put_buy']['option_name']
-
-
-                paper_option_data_info['put_buy']['quantity']=0
-                a=[name,put_price,'SELL',0,0,spot_price,0]
-                paper_option_data_info['put_buy']['filled_df'].loc[ct] = a
-                paper_option_data_info['put_buy']['trade_flag']=2
-
+                paper_option_data_info['put_buy']['quantity']=0 #update quantity
+                a=[put_name,put_price,'SELL',0,0,spot_price,0]
+                paper_option_data_info['put_buy']['filled_df'].loc[ct] = a #update dataframe
+                paper_option_data_info['put_buy']['trade_flag']=2 #update flag
                 print('put sell condition satisfied')
 
 
         #update dataframe
-        if not paper_option_data_info['call_buy']['filled_df'].empty:
-            paper_option_data_info['call_buy']['filled_df'].to_csv(f'call_buy_{dt.date.today()}.csv')    
+        if not paper_option_data_info['call_buy']['filled_df'].empty: #if call dataframe is not empty
+            paper_option_data_info['call_buy']['filled_df'].to_csv(f'call_buy_{dt.date.today()}.csv') #save to call csv file    
         
-        if not paper_option_data_info['put_buy']['filled_df'].empty:
-            paper_option_data_info['put_buy']['filled_df'].to_csv(f'put_buy_{dt.date.today()}.csv')
+        if not paper_option_data_info['put_buy']['filled_df'].empty: #if put  dataframe is not empty
+            paper_option_data_info['put_buy']['filled_df'].to_csv(f'put_buy_{dt.date.today()}.csv') #save to put csv file
   
-        store(paper_option_data_info,account_type)
+        store(paper_option_data_info,account_type) #store to pickle file
+
 
 def real_order():
     global quantity
     global live_option_data_info
     global df
     global spot_price
-    spot_price=df[df['symbol']==ticker]['ltp'].iloc[0]
+    #get spot price
 
     spot_price=df.loc[ticker,'ltp']
     print(f"spot is {spot_price} pivot is {pivot} support is {support} resistance is {resistance}")
-    print(spot_price)
+    #current time
     ct=dt.datetime.now()
+    
+    #if current time is greater than current time than start strategy
     if ct>start_time:
 
-        # print(df)
+        #get flag
         call_buy_trade_flag=live_option_data_info['call_buy']['trade_flag']
         put_buy_trade_flag=live_option_data_info['put_buy']['trade_flag']
 
+        #quantity
+        call_quantity=live_option_data_info['call_buy']['quantity']
+        put_quantity=live_option_data_info['put_buy']['quantity']
+
+        #get stop price
         call_buy_stop_price=live_option_data_info['call_buy']['current_stop_price']
         put_buy_stop_price=live_option_data_info['put_buy']['current_stop_price']
 
+        #get target price
         call_buy_profit_price=live_option_data_info['call_buy']['current_profit_price']
         put_buy_profit_price=live_option_data_info['put_buy']['current_profit_price']
         
+        #get name
         call_name=live_option_data_info['call_buy']['option_name']
         put_name=live_option_data_info['put_buy']['option_name']
 
+        #get buy price
         call_buy_price=live_option_data_info['call_buy']['buy_price']
         put_buy_price=live_option_data_info['put_buy']['buy_price']
-        # print(call_name, put_name)
-        # call_price=df[df['symbol']==call_name]['ltp'].iloc[0]
+
+        #get current price
         call_price=df.loc[call_name,'ltp']
-        # put_price=df[df['symbol']==put_name]['ltp'].iloc[0]
         put_price=df.loc[put_name,'ltp']
 
-        print(call_price,put_price)
+        #get condition
         condition=live_option_data_info['condition']
+        print(call_price,put_price)
 
+        #if current time is greater than end time
         if ct>end_time:
             print('closing everything')
             
+            #if we have taken trade 
             if call_buy_trade_flag==1:
-                name=live_option_data_info['call_buy']['option_name']
-                data = {"id":name+"-INTRADAY"}
+                #close call buy position
+                data = {"id":call_name+"-INTRADAY"}
                 response = fyers.exit_positions(data=data)
                 print(response)
 
                 if response['s']=='ok':
-
-                    live_option_data_info['call_buy']['quantity']=0
-                    # call_buy_ltp=df[df['symbol']==call_name]['ltp'].iloc[0]
-                    call_buy_ltp=df.loc[name,'ltp']
-                    
+                    live_option_data_info['call_buy']['quantity']=0 #change quantity
+                    call_buy_ltp=df.loc[call_name,'ltp'] #get current price
+                    name=live_option_data_info['call_buy']['option_name'] #get current name
                     a=[name,call_buy_ltp,'SELL',0,0,spot_price,live_option_data_info['call_buy']['quantity']]
-                    live_option_data_info['call_buy']['filled_df'].loc[dt.datetime.now()] = a
-                    live_option_data_info['call_buy']['trade_flag']=2
+                    live_option_data_info['call_buy']['filled_df'].loc[dt.datetime.now()] = a #update dataframe
+                    live_option_data_info['call_buy']['trade_flag']=2 #change flag so no trade taken again
+                    logging.info('closing call leg due to time condition') 
 
             if put_buy_trade_flag==1:
-                name=live_option_data_info['put_buy']['option_name']
-                data = {"id":name+"-INTRADAY"}
+                data = {"id":put_name+"-INTRADAY"}
                 response = fyers.exit_positions(data=data)
                 print(response)
-
                 if response['s']=='ok':
-                    live_option_data_info['put_buy']['quantity']=0
-                    # put_buy_ltp=df[df['symbol']==put_name]['ltp'].iloc[0]
-                    put_buy_ltp=df.loc[put_name,'ltp']
-            
+                    live_option_data_info['put_buy']['quantity']=0 #change quantity
+                    put_buy_ltp=df.loc[put_name,'ltp'] #get current price
+                    name=live_option_data_info['put_buy']['option_name'] #get current name
                     a=[name,put_buy_ltp,'SELL',0,0,spot_price,live_option_data_info['put_buy']['quantity']]
-                    live_option_data_info['put_buy']['filled_df'].loc[dt.datetime.now()] = a
-                    live_option_data_info['put_buy']['trade_flag']=2
+                    live_option_data_info['put_buy']['filled_df'].loc[dt.datetime.now()] = a #update dataframe
+                    live_option_data_info['put_buy']['trade_flag']=2 #change flag so no trade taken again
+                    logging.info('closing put leg due to time condition') 
 
-            
-
-        #condition satisfied
+        #buy condition satisfied
         if (pivot-buffer<=spot_price<=pivot+buffer) or (support-buffer<=spot_price <= support+buffer ) or (resistance-buffer <= spot_price <= resistance+buffer) :
+
             if condition==False:
       
                 logging.info('strategy condition condition satisfied')  
                 
-                call_name=get_otm_option(spot_price, 'CE',0)
-                live_option_data_info['call_buy']['option_name']=call_name
-                live_option_data_info['call_buy']['quantity']=quantity
+                call_name=get_otm_option(spot_price, 'CE',0) #get call name
+                live_option_data_info['call_buy']['option_name']=call_name #update call name data
+                live_option_data_info['call_buy']['quantity']=quantity #update quantity
 
-                put_name=get_otm_option(spot_price, 'PE', 0)
-                live_option_data_info['put_buy']['option_name']=put_name
-                live_option_data_info['put_buy']['quantity']=quantity
+                put_name=get_otm_option(spot_price, 'PE', 0) #get put name
+                live_option_data_info['put_buy']['option_name']=put_name #update put name
+                live_option_data_info['put_buy']['quantity']=quantity #update put quantity
 
-                # current_price=df[df['symbol']==call_name]['ltp'].iloc[0]
-                current_price=df.loc[call_name,'ltp']
-                call_buy_ltp=current_price+profit_loss_point
-                call_buy_stop_price=call_buy_ltp-profit_loss_point
-                call_buy_profit_price=call_buy_ltp+profit_loss_point
 
-                # current_price=df[df['symbol']==put_name]['ltp'].iloc[0]
-                current_price=df.loc[put_name,'ltp']
-                put_buy_ltp=current_price+profit_loss_point
-                put_buy_stop_price=put_buy_ltp-profit_loss_point
-                put_buy_profit_price=put_buy_ltp+profit_loss_point
+                current_price=df.loc[call_name,'ltp'] #get call current price
+                call_buy_ltp=current_price+profit_loss_point  #get call buy price
+                call_buy_stop_price=call_buy_ltp-profit_loss_point #get call stop price
+                call_buy_profit_price=call_buy_ltp+profit_loss_point #get call profit price
 
-                live_option_data_info['call_buy']['buy_price']=call_buy_ltp
-                live_option_data_info['call_buy']['current_stop_price']=call_buy_stop_price
-                live_option_data_info['call_buy']['current_profit_price']=call_buy_profit_price
 
-                live_option_data_info['put_buy']['buy_price']=put_buy_ltp
-                live_option_data_info['put_buy']['current_stop_price']=put_buy_stop_price
-                live_option_data_info['put_buy']['current_profit_price']=put_buy_profit_price
+                current_price=df.loc[put_name,'ltp'] #get put current price
+                put_buy_ltp=current_price+profit_loss_point #get put buy price
+                put_buy_stop_price=put_buy_ltp-profit_loss_point #get put stop price
+                put_buy_profit_price=put_buy_ltp+profit_loss_point #get put profit price
 
-                live_option_data_info['condition']=True
+                live_option_data_info['call_buy']['buy_price']=call_buy_ltp #save call buy price
+                live_option_data_info['call_buy']['current_stop_price']=call_buy_stop_price #save call stop price
+                live_option_data_info['call_buy']['current_profit_price']=call_buy_profit_price #save call take profit
+
+                live_option_data_info['put_buy']['buy_price']=put_buy_ltp #save put buy price
+                live_option_data_info['put_buy']['current_stop_price']=put_buy_stop_price #save put stop price
+                live_option_data_info['put_buy']['current_profit_price']=put_buy_profit_price #save put profit price
+
+                live_option_data_info['condition']=True #update condition
                 logging.info(f"call price is {call_buy_ltp} and put price is {put_buy_ltp}")
                 print('done fetching prices')
 
         #call buy condition
         if (condition==True) and (call_buy_price<=call_price) and (call_buy_trade_flag==0) :
             data = {
-                "symbol":live_option_data_info['call_buy']['option_name'],
-                "qty":quantity,
+                "symbol":call_name,
+                "qty":call_quantity,
                 "type":2,
                 "side":1,
                 "productType":"INTRADAY",
@@ -563,44 +578,36 @@ def real_order():
                 "takeProfit":0
             }
 
-            response3 = fyers.place_order(data=data)
+            response3 = fyers.place_order(data=data) #place market buy order
 
             if response3['s']=='ok':
                 a=[call_name,call_price,'BUY',call_buy_stop_price,call_buy_profit_price,spot_price,quantity] 
-                live_option_data_info['call_buy']['filled_df'].loc[ct] = a
-                live_option_data_info['call_buy']['trade_flag']=1
-                live_option_data_info['put_buy']['trade_flag']=3
-                logging.info('print done buying')
-                print('call buy condition satisfied')
+                live_option_data_info['call_buy']['filled_df'].loc[ct] = a #save to dataframe
+                live_option_data_info['call_buy']['trade_flag']=1 #update call flag
+                live_option_data_info['put_buy']['trade_flag']=3 #update put flag
+                logging.info(f'call buy condition satisfied name is {call_name} price is {call_price}')
 
 
         #call sell condition
         elif condition==True and (call_buy_trade_flag==1) :
-        
             if (call_price>call_buy_profit_price) or (call_price<call_buy_stop_price):
-                logging.info('sell call condition satisfied')   
-                #close position
-                name=live_option_data_info['call_buy']['option_name']
-                data = {"id":name+"-INTRADAY"}
+                data = {"id":call_name+"-INTRADAY"}
                 response = fyers.exit_positions(data=data)
                 print(response)
 
-                if response['s']=='ok':
-
-
-                    live_option_data_info['call_buy']['quantity']=0
-                    a=[name,call_price,'SELL',0,0,spot_price,0]
-                    live_option_data_info['call_buy']['filled_df'].loc[ct] = a
-                    live_option_data_info['call_buy']['trade_flag']=2
-                    print('call sell condition satisfied')
+                if response['s']=='ok':  
+                    live_option_data_info['call_buy']['quantity']=0 #update quantity
+                    a=[call_name,call_price,'SELL',0,0,spot_price,0]
+                    live_option_data_info['call_buy']['filled_df'].loc[ct] = a #update dataframe
+                    live_option_data_info['call_buy']['trade_flag']=2 #update flag
+                    logging.info(f'call sell condition satisfied name is {call_name} price is {call_price}')
 
 
         #put buy condition
         if (condition==True) and (put_buy_price<=put_price) and (put_buy_trade_flag==0) :
-
             data = {
-                "symbol":live_option_data_info['put_buy']['option_name'],
-                "qty":quantity,
+                "symbol":put_name,
+                "qty":put_quantity,
                 "type":2,
                 "side":1,
                 "productType":"INTRADAY",
@@ -613,47 +620,41 @@ def real_order():
                 "takeProfit":0
             }
 
-            response3 = fyers.place_order(data=data)
+            response3 = fyers.place_order(data=data) #place market buy order
 
-            if response3['s']=='ok': 
-
+            if response3['s']=='ok':
                 a=[put_name,put_price,'BUY',put_buy_stop_price,put_buy_profit_price,spot_price,quantity]
-                live_option_data_info['put_buy']['filled_df'].loc[ct] = a
-                live_option_data_info['put_buy']['trade_flag']=1
-                live_option_data_info['call_buy']['trade_flag']=3
-                logging.info('put buy condition satisfied')
-                print('put buy condition satisfied')
+                live_option_data_info['put_buy']['filled_df'].loc[ct] = a #update dataframe
+                live_option_data_info['put_buy']['trade_flag']=1 #update put flag
+                live_option_data_info['call_buy']['trade_flag']=3 #update call flag
+                logging.info(f'put buy condition satisfied name is {put_name} price is {put_price}')
+                print(f'put buy condition satisfied name is {put_name} price is {put_price}')
 
 
         #put sell condition
         elif condition==True and (put_buy_trade_flag==1):
             if (put_price>put_buy_profit_price) or (put_price<put_buy_stop_price):
-                logging.info('sell put condition satisfied')
-                #close position
-
-                name=live_option_data_info['put_buy']['option_name']
-                data = {"id":name+"-INTRADAY"}
+         
+                data = {"id":put_name+"-INTRADAY"}
                 response = fyers.exit_positions(data=data)
                 print(response)
 
                 if response['s']=='ok':
-                    live_option_data_info['put_buy']['quantity']=0
-                    a=[name,put_price,'SELL',0,0,spot_price,0]
-                    live_option_data_info['put_buy']['filled_df'].loc[ct] = a
-                    live_option_data_info['put_buy']['trade_flag']=2
+                    live_option_data_info['put_buy']['quantity']=0 #update quantity
+                    a=[put_name,put_price,'SELL',0,0,spot_price,0]
+                    live_option_data_info['put_buy']['filled_df'].loc[ct] = a #update dataframe
+                    live_option_data_info['put_buy']['trade_flag']=2 #update flag
                     print('put sell condition satisfied')
 
 
         #update dataframe
-        if not live_option_data_info['call_buy']['filled_df'].empty:
-            live_option_data_info['call_buy']['filled_df'].to_csv(f'call_buy_{dt.date.today()}.csv')    
+        if not live_option_data_info['call_buy']['filled_df'].empty: #if call dataframe is not empty
+            live_option_data_info['call_buy']['filled_df'].to_csv(f'call_buy_{dt.date.today()}.csv') #save to call csv file    
         
-        if not live_option_data_info['put_buy']['filled_df'].empty:
-            live_option_data_info['put_buy']['filled_df'].to_csv(f'put_buy_{dt.date.today()}.csv')
+        if not live_option_data_info['put_buy']['filled_df'].empty: #if put  dataframe is not empty
+            live_option_data_info['put_buy']['filled_df'].to_csv(f'put_buy_{dt.date.today()}.csv') #save to put csv file
   
-        store(live_option_data_info,account_type)
-
-
+        store(live_option_data_info,account_type) #store to pickle file
 
 
 
@@ -675,7 +676,7 @@ async def main_strategy_code():
 
         await asyncio.sleep(1)
 
-
+ 
 async def main():
     while True:
         await main_strategy_code()
