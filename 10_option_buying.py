@@ -132,9 +132,6 @@ def calculate_cpr(high, low, close):
 pivot,resistance,support = calculate_cpr(hist_data['high'].iloc[-1], hist_data['low'].iloc[-1], hist_data['close'].iloc[-1])
 print(pivot,resistance,support)
 
-resistance=52800
-pivot=52750
-
 
 # option chain
 data = {
