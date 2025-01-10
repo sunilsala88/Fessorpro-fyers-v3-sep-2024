@@ -113,10 +113,10 @@ def candle_renko_refresh(ticker):
     global paper_option_data_info
     brick_size=paper_option_data_info.get(ticker).get('brick_size')
     # brick_size=3
-    data=fetchOHLC(ticker,'1',5)          
+    data=fetchOHLC(ticker,'1',2)          
     calculated_values = {}
     mpf.plot(data, type='renko', renko_params=dict(brick_size=brick_size),return_calculated_values=calculated_values,returnfig=True,style='yahoo')
-
+    plt.close()
     renko_df = pd.DataFrame(calculated_values)
     last=renko_df['renko_bricks'].iloc[-1]
     def count_bricks(sign_list):
@@ -650,7 +650,7 @@ async def main_strategy_code():
             print(pnl)
         
         #every 1 min
-        if ct.second == 1:
+        if ct.second == 2:
             for ticker in list_of_tickers.values():
                 candle_renko_refresh(ticker)
 
